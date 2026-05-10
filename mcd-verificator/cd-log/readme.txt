@@ -1,1 +1,0 @@
-cdd communication logs from real hardware

@@ -1,2 +1,0 @@
-megalink -reset
-pause

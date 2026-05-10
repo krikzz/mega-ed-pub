@@ -1,2 +1,0 @@
-fout=font.bgr
-font=font.png

@@ -1,0 +1,10 @@
+*.bak
+*.o
+*.deb
+*.qws
+db
+incremental_db
+.vs
+obj
+build
+nbproject
