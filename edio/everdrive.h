@@ -61,10 +61,22 @@ typedef enum {
 
 
 //****************************************************************************** edio
-#define REG_FIFO_DATA   *((vu16 *)0xA130D0) //fifo data register
-#define REG_FIFO_STAT   *((vu16 *)0xA130D2) //fifo status register. shows if fifo can be readed.
-#define REG_SYS_STAT    *((vu16 *)0xA130D4)
-#define REG_TIMER       *((vu16 *)0xA130D6)
+typedef struct {
+    vu8 reserved0;
+    vu8 FIFODATA; //    R/W  Fifo data register
+    vu16 FIFOSTAT; //   R    Fifo status register. shows if fifo can be readed.
+    vu16 SYSSTAT; //    R    Last cmd status
+    vu16 TIMER; //      R    System timer, 16bit, 1ms resolution
+    vu8 reserved1;
+    vu8 MEMDATA;//      R/W  Mem data
+    vu8 reserved2;
+    vu8 MEMADDR;//      W    Mem addr (serial). required using MEM_WP_MASK
+    vu16 SSTCTRL;//     W    IGM handler controls
+    vu16 MBX;//         R/W  gp mailbox register (mirror at ADDR_FCI_MBX)
+} Edio;
+
+#define EDIO_BASE       0xA130D0
+#define EDIO            ((Edio *) EDIO_BASE)
 
 #define FIFO_CPU_RXF    0x8000 //fifo flags. system cpu can read
 #define FIFO_ARM_RXF    0x4000 //fifo flags. mcu can read
@@ -78,39 +90,48 @@ typedef enum {
 
 #define HOST_RST_SOFT   0x01
 #define HOST_RST_HARD   0x02
+
+#define MEM_WP_MASK     0x80000000
 //******************************************************************************
-//PI bus addresses
-#define ADDR_ROM        0x0000000       //ROM MEMORY    (2x8MB PSRAM)
-#define ADDR_SRAM       0x1000000       //SRAM          (fast 10ns mem)
-#define ADDR_BRAM       0x1080000       //Batery RAM 
-#define ADDR_CFG        0x1800000       //various system configs
-#define ADDR_SSR        0x1800100       //save state. sniffer data and mapper registers if any. !used by sms core!
-#define ADDR_FIFO       0x1810000       //fifo buffer
-#define ADDR_MAP        0x1830000       //mapper registers
+//FCI bus addresses space
+#define ADDR_FCI_ROM    0x00000000 //ROM MEMORY    (2x8MB PSRAM)
+#define ADDR_FCI_DBUF   0x00F00000 //data buffer 256K. sms sst use it as SST_BUFF
+#define ADDR_FCI_SST_BF 0x00F40000 //current save state 256K
+#define ADDR_FCI_MENU   0x00F80000 //menu program
+#define ADDR_FCI_SST_MS 0x00EF0000 //sms sst core. mapped to the end of menu ram
+#define ADDR_FCI_SRAM   0x01000000 //SRAM          (fast 10ns mem)
+#define ADDR_FCI_BRAM   0x01080000 //Batery RAM 
+#define ADDR_FCI_CFG    0x01800000 //various system configs
+#define ADDR_FCI_SST_SR 0x01800100 //save state. sniffer data and mapper registers if any. !used by sms core!
+#define ADDR_FCI_MSTAT  0x01800200 //mapper status
+#define ADDR_FCI_MBX    0x01800300 //gp mailbox
+#define ADDR_FCI_FIFO   0x01810000 //fifo buffer
+#define ADDR_FCI_MAP    0x01830000 //mapper registers
+#define ADDR_FCI_MCD    0x01840000 //mcd
+#define ADDR_FCI_MDP    0x01850000 //MD+
 
+#define ADDR_FCI_BRM_MD (ADDR_FCI_BRAM + 0x00000)//regular saves
+#define ADDR_FCI_BRM_RC (ADDR_FCI_BRAM + 0x00000)//cd cart
+#define ADDR_FCI_BRM_CD (ADDR_FCI_BRAM + 0x40000)//cd int bram
 
-#define ADDR_BRM_STD    (ADDR_BRAM + 0x00000)
-#define ADDR_BRM_CDCART (ADDR_BRAM + 0x00000)
-#define ADDR_BRM_CDBRAM (ADDR_BRAM + 0x40000)
-#define ADDR_BRM_SST    (ADDR_ROM  + SIZE_ROM - 0x100000)
-#define ADDR_CDBIOS     (ADDR_BRAM + 0x60000)
-#define ADDR_MSBIOS     (ADDR_ROM  + 0x400000)
-#define ADDR_OS_PRG     (ADDR_ROM  + SIZE_ROM - 0x80000)
-#define ADDR_CSTART     (ADDR_OS_PRG + ADDR_MD_CSTART) //cold start marker
-#define ADDR_MAP_MOD    (ADDR_MAP  + 0xffff)  //mapper mode.0xA5 if not supported
+#define ADDR_FCI_MSBIOS (ADDR_FCI_ROM  + 0x400000)
+#define ADDR_FCI_CDBIOS (ADDR_FCI_BRAM + 0x60000)
+
+#define ADDR_FCI_MAPCFG (ADDR_FCI_MAP  + 0xFF00)  //mapper specific config
+#define ADDR_FCI_MCDCFG (ADDR_FCI_MCD  + 0xFF00)  //mapper specific config
+#define ADDR_FCI_MARKS  (ADDR_FCI_MENU + 0x00180)
+#define ADDR_FCI_CFGCC  (ADDR_FCI_CFG + 0)        //rom cheats config
+#define ADDR_FCI_CFGMAP (ADDR_FCI_CFG + 128)      //mapper config
 
 
 #define ADDR_FLA_MENU   0x00000         //boot fails cpu code
 #define ADDR_FLA_FPGA   0x40000         //boot fails fpga code
 #define ADDR_FLA_ICOR   0x80000         //mcu firmware update
 
-#define SIZE_ROM        0x1000000       //ROM chip size 
-#define SIZE_BRAM       0x80000         //battery ram size
-#define SIZE_SRAM       0x80000         //SRAM chip size
-#define SIZE_OS_CODE    0x40000         //OS CODE SIZE 
-#define SIZE_OS_RAM     0x40000         //OS RAM SIZE
+#define SIZE_MENU_CODE  0x40000         //MENU CODE SIZE 
+#define SIZE_MENU_WRAM  0x30000         //MENU RAM SIZE (last 64k used for sms sst core)
 #define SIZE_FIFO       2048            //fifo buffer size between cpu and mcu
-#define SIZE_IOCORE     0x20008         //IO core update size
+#define SIZE_DBUF       0x40000         //IO buffer size. actually 256K
 
 
 #define GG_SLOTS        16
@@ -127,22 +148,32 @@ typedef enum {
 #define	FA_OPEN_ALWAYS		0x10
 #define	FA_OPEN_APPEND		0x30
 
-#define	AT_RDO	0x01	/* Read only */
-#define	AT_HID	0x02	/* Hidden */
-#define	AT_SYS	0x04	/* System */
-#define AT_DIR	0x10	/* Directory */
-#define AT_ARC	0x20	/* Archive */
+#define	AT_RDO                  0x01	/* Read only */
+#define	AT_HID                  0x02	/* Hidden */
+#define	AT_SYS                  0x04	/* System */
+#define AT_DIR                  0x10	/* Directory */
+#define AT_ARC                  0x20	/* Archive */
 
-#define DIR_OPT_SORTED  1
-#define DIR_OPT_HIDCUE  2
-#define DIR_OPT_SEEKCUE 4
+#define DIR_OPT_SORTED          0x01
+#define DIR_OPT_HIDESYS         0x02
+#define DIR_OPT_SEEKCUE         0x04
+#define DIR_OPT_FILTCUE         0x08
+#define DIR_OPT_FILTROM         0x10
+#define DIR_OPT_FILTRBF         0x20
+#define DIR_OPT_CUTFNAM         0x80
 //****************************************************************************** system control
-#define SYS_CTRL_RSTOFF 0x01    //with this option quick reset wil reset the game but will not return to menu
-#define SYS_CTRL_SS_ON  0x02    //vblank hook for in-game menu
-#define SYS_CTRL_GG_ON  0x04    //cheats engine
-#define SYS_CTRL_SS_BTN 0x08    //use external button for save state
-#define SYS_CTRL_MKY_ON 0x10    //megakey
-#define SYS_CTRL_GMODE  0x80    //mcu sets this bit when fpga configuration complete.
+#define SYS_CTRL_RSTOFF         0x01    //with this option quick reset wil reset the game but will not return to menu
+#define SYS_CTRL_SST_ON         0x02    //vblank hook for in-game menu
+#define SYS_CTRL_GG_ON          0x04    //cheats engine
+#define SYS_CTRL_SST_BTN        0x08    //use external button for save state
+#define SYS_CTRL_MEGASG         0x10    //hacks for eliminating mega-sg bugs
+#define SYS_CTRL_32X            0x20    //specific reset mode for 32x
+#define SYS_CTRL_SMS            0x40    //specific reset and sst mode for sms
+#define SYS_CTRL_GMODE          0x80    //mcu sets this bit when fpga configuration complete.
+//****************************************************************************** features
+#define FEA_MCD         0x01    //eable mcd core
+#define FEA_MDP         0x02    //eable MD+
+#define FEA_EXT         0x04    //extension unit simulation
 //****************************************************************************** game mapper control
 #define BRAM_OFF        0x00
 #define BRAM_SRM        0x01

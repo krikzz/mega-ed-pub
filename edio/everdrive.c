@@ -369,7 +369,7 @@ void ed_cmd_mem_rd(u32 addr, void *dst, u32 len) {
     ed_fifo_wr(&addr, 4);
     ed_fifo_wr(&len, 4);
 
-    if (addr < ADDR_CFG) {
+    if (addr < ADDR_FCI_CFG) {
         ed_run_dma();
     } else {
         ed_fifo_wr(&ack, 1); //move to ram app for access to memoey
@@ -385,7 +385,7 @@ void ed_cmd_mem_wr(u32 addr, void *src, u32 len) {
 
     while (len) {
 
-        if (addr < ADDR_CFG)ack = 0xaa; //force to wait second ack byte befor dma
+        if (addr < ADDR_FCI_CFG)ack = 0xaa; //force to wait second ack byte befor dma
         block = min(len, ACK_BLOCK_SIZE);
 
         ed_cmd_tx(CMD_MEM_WR);
@@ -484,7 +484,7 @@ u8 ed_cmd_cd_mount(u8 *path) {
 u8 ed_cmd_rom_path(u8 *path, u8 path_type) {
 
     ed_cmd_tx(CMD_ROM_PATH);
-    ed_fifo_wr(&path_type, 1); //0-rom, 1-cue
+    ed_fifo_wr(&path_type, 1); //path_type: 0-rom, 1-cue
     ed_rx_string(path);
     return ed_check_status();
 }
@@ -496,10 +496,10 @@ u8 ed_cmd_rom_path(u8 *path, u8 path_type) {
 void ed_fifo_flush() {
 
     vu8 tmp;
-    REG_FIFO_DATA = 0;
-    REG_FIFO_DATA = 0;
-    while ((REG_FIFO_STAT & FIFO_RXF_MSK)) {
-        tmp = REG_FIFO_DATA;
+    EDIO->FIFODATA = 0;
+    EDIO->FIFODATA = 0;
+    while ((EDIO->FIFOSTAT & FIFO_RXF_MSK)) {
+        tmp = EDIO->FIFODATA;
     }
 }
 
@@ -508,7 +508,7 @@ void ed_fifo_wr(void *data, u16 len) {
     u8 *data8 = data;
 
     while (len--) {
-        REG_FIFO_DATA = *data8++;
+        EDIO->FIFODATA = *data8++;
     }
 
 }
@@ -521,19 +521,19 @@ void ed_fifo_rd(void *data, u16 len) {
 
     while (len) {
 
-        block = REG_FIFO_STAT & FIFO_RXF_MSK;
+        block = EDIO->FIFOSTAT & FIFO_RXF_MSK;
         if (block > len)block = len;
         len -= block;
 
         while (block >= 4) {
-            *data8++ = REG_FIFO_DATA;
-            *data8++ = REG_FIFO_DATA;
-            *data8++ = REG_FIFO_DATA;
-            *data8++ = REG_FIFO_DATA;
+            *data8++ = EDIO->FIFODATA;
+            *data8++ = EDIO->FIFODATA;
+            *data8++ = EDIO->FIFODATA;
+            *data8++ = EDIO->FIFODATA;
             block -= 4;
         }
 
-        while (block--) *data8++ = REG_FIFO_DATA;
+        while (block--) *data8++ = EDIO->FIFODATA;
     }
 
 }
@@ -544,8 +544,8 @@ u8 ed_fifo_rd_skip(u16 len) {
 
     while (len--) {
 
-        while ((REG_FIFO_STAT & FIFO_CPU_RXF));
-        tmp = REG_FIFO_DATA;
+        while ((EDIO->FIFOSTAT & FIFO_CPU_RXF));
+        tmp = EDIO->FIFODATA;
     }
 
     return 0;
@@ -553,7 +553,7 @@ u8 ed_fifo_rd_skip(u16 len) {
 
 u8 ed_fifo_busy() {
 
-    return (REG_FIFO_STAT & FIFO_CPU_RXF) ? 1 : 0;
+    return (EDIO->FIFOSTAT & FIFO_CPU_RXF) ? 1 : 0;
 }
 
 u8 ed_check_status() {
@@ -634,13 +634,13 @@ u8 ed_file_get_size(u8 *path, u32 *size) {
 
 void ed_sleep(u16 ms) {
 
-    u16 time = REG_TIMER;
-    while ((u16) (REG_TIMER - time) < ms);
+    u16 time = EDIO->TIMER;
+    while ((u16) (EDIO->TIMER - time) < ms);
 }
 
 u16 ed_get_ticks() {
 
-    return REG_TIMER;
+    return EDIO->TIMER;
 }
 
 void ed_reboot(u8 status) {
@@ -656,13 +656,13 @@ void ed_halt_app(u8 stat_req) {//must be executed from ram area
 
     vu16 stat;
 
-    REG_SYS_STAT = stat_req;
-    REG_FIFO_DATA = 0; //exec
+    EDIO->SYSSTAT = stat_req;
+    EDIO->FIFODATA = 0; //exec
 
     while (1) {
-        stat = REG_SYS_STAT;
+        stat = EDIO->SYSSTAT;
         if ((stat & (0xFFF0 | STATUS_STROBE)) != (0x55A0 | STATUS_STROBE))continue;
-        stat = REG_SYS_STAT;
+        stat = EDIO->SYSSTAT;
         if ((stat & (0xFFF0 | STATUS_STROBE)) != 0x55A0)continue;
         if ((stat & stat_req) != 0)continue;
         break;

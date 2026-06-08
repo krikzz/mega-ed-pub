@@ -14,6 +14,7 @@ void usbRead();
 void usbWrite();
 u8 romPath();
 void deviceID();
+void mailbox();
 
 int main() {
 
@@ -58,6 +59,7 @@ u8 megaio() {
         MENU_RTC,
         MENU_ROM_PATH,
         MENU_DEVID,
+        MENU_MAILBOX,
         MENU_EXIT,
         MENU_SIZE
     } MENU;
@@ -76,11 +78,12 @@ u8 megaio() {
     menu[MENU_RTC] = "rtc";
     menu[MENU_ROM_PATH] = "rom path";
     menu[MENU_DEVID] = "device id";
+    menu[MENU_MAILBOX] = "mailbox io";
     menu[MENU_EXIT] = "back to menu";
     menu[MENU_SIZE] = 0;
 
     while (1) {
-        gSetXY(12, 8);
+        gSetXY(12, 7);
 
         for (i = 0; menu[i] != 0; i++) {
             gConsPrint(selector == i ? ">" : " ");
@@ -144,6 +147,10 @@ u8 megaio() {
                 deviceID();
                 break;
 
+            case MENU_MAILBOX:
+                mailbox();
+                break;
+
         }
 
         if (resp)return resp;
@@ -194,6 +201,10 @@ u8 fileReadToRam() {//read readme.txt to ram and print to the screen
     u8 resp;
 
     gCleanPlan();
+    gConsPrint("file target: ");
+    gAppendString(path);
+    gConsPrint("file content: ");
+    gConsPrint("");
 
     resp = ed_cmd_file_open(path, FA_READ);
     if (resp)return resp;
@@ -216,10 +227,13 @@ u8 fileReadToRom() {//read readme.txt to rom memory and print to the screen. m68
 
     u8 *path = "MEGA/bios/readme.txt";
     u8 resp;
-    u32 rom_dst = ADDR_ROM + 0x10000;
+    u32 rom_dst = ADDR_FCI_ROM + 0x10000;
 
     gCleanPlan();
-
+    gConsPrint("file target: ");
+    gAppendString(path);
+    gConsPrint("file content: ");
+    gConsPrint("");
 
     resp = ed_cmd_file_open(path, FA_READ);
     if (resp)return resp;
@@ -424,4 +438,37 @@ void deviceID() {
     }
 
     sysJoyWait();
+}
+
+void mailbox() {
+
+    u16 ctr = 0x1234;
+
+    gCleanPlan();
+    while (sysJoyRead() != 0)gVsync();
+
+    EDIO->MBX = 0;
+
+    while (1) {
+
+        gSetXY(0, 0);
+        gConsPrint("run mbx_rd.py to read mailbox on PC");
+        gConsPrint("run mbx_wr.py to write mailbox on PC");
+        gConsPrint("press [A] to write ctr value in mailbox");
+        gConsPrint("press [B] to exit");
+        
+        gConsPrint("mailbox: 0x");
+        gAppendHex16(EDIO->MBX);
+
+        gVsync();
+        u16 joy = sysJoyRead();
+
+        if (joy == JOY_A) {
+            while (sysJoyRead());
+            EDIO->MBX = ctr;
+            ctr++;
+        } else if (joy) {
+            return;
+        }
+    }
 }
