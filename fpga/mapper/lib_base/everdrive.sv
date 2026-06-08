@@ -83,6 +83,13 @@ module everdrive(
 	assign cpu.ce_lo 				= ce_lo;
 	assign cpu.tim 				= {cpu_addr[23:8], 8'd0} == 24'hA13000 & !as ? 0 : 1;
 	assign cpu.vclk 				= vclk;
+	assign cpu.we_ck				= we_ff == 'b100;
+	
+	reg [2:0]we_ff;
+	always @(posedge mai.clk)
+	begin
+		we_ff		<= {we_ff[1:0], (we_lo & we_hi)};
+	end
 //************************************************************************************* bus controls
 	assign mcu_rst 	= mcd_mcu_rst;
 	assign mcu_sync 	= mcd_mcu_sync;
@@ -96,10 +103,11 @@ module everdrive(
 		
 	assign cpu_dati[15:0] = 
 	base_io_oe 		? base_io_do[15:0] :
+	sst_ram_ce		? sst_ram_do[15:0] :
 	cheats_oe 		? cheats_do[15:0] :
 	mdp_oe			? mdp_data[15:0] :
 	mcd_oe			? mcd_do :
-	mao.map_oe 		? mao.map_do[15:0] : 
+	mao.map_oe 		? mao.map_do[15:0] :
 	16'h0000;
 	
 	
@@ -164,14 +172,16 @@ module everdrive(
 	);
 	
 	
+	wire bus_oe	= !cpu.oe & (cheats_oe | base_io_oe | mao.map_oe | mdp_oe | mcd_oe | sst_ram_ce);
 	
 	bus_ctrl bus_ctrl_inst(
 		.clk(mai.clk),
 		.sys_rst(mai.sys_rst),
-		.bus_oe(cheats_oe | base_io_oe | mao.map_oe | mdp_oe | mcd_oe),
-		.dat_dir(dat_dir), 
+		.bus_oe(bus_oe),
+		.dat_dir(dat_dir),
 		.dat_oe(dat_oe)
 	);
+	
 	
 //************************************************************************************* map in
 	assign mai.cpu					= cpu;
@@ -242,6 +252,7 @@ module everdrive(
 	wire [15:0]base_io_do;
 	wire base_io_oe;
 	wire [3:0]mio_ce;
+	wire sst_ctrl_we;
 	
 	base_io base_io_inst(
 		
@@ -250,9 +261,10 @@ module everdrive(
 		.pi_di(pi_di_bio),
 		.dato(base_io_do),
 		.io_oe(base_io_oe),
-		.pi_fifo_rxf(mcu_fifo_rxf),
+		.fci_fifo_rxf(mcu_fifo_rxf),
 		.mio_mem(mio_mem),
-		.mio_ce(mio_ce)
+		.mio_ce(mio_ce),
+		.sst_ctrl_we(sst_ctrl_we),
 	);
 	
 //************************************************************************************* pi
@@ -260,6 +272,7 @@ module everdrive(
 	pi.map.dst_mem ? dma.pi_di : 
 	pi.map.ce_cfg  ? pi_di_cfg : 
 	pi.map.ce_fifo	? pi_di_bio :
+	pi.map.ce_mbx	? pi_di_bio :
 	pi.map.dst_map ? mout_hub.pi_di[7:0] :
 	pi.map.ce_mcd  ? pi_di_mcd :
 	pi.map.ce_sst 	? pi_di_sst :
@@ -352,32 +365,37 @@ module everdrive(
 	wire sst_act_smd, sst_act_sms;
 	wire [7:0]pi_di_sst;
 	
+	wire [15:0]sst_ram_do;
+	wire sst_ram_ce;
 
 	
-`ifdef USE_SST_SMS
-	`define 	USE_SST
-`elsif USE_SST_SMD
-	`define 	USE_SST
+`ifdef SST_SMS_ON
+	`define 	SST_ON
+`elsif SST_SMD_ON
+	`define 	SST_ON
 `endif	
 	
 	
-`ifdef USE_SST
+`ifdef SST_ON
 
 	sst_controller sst_inst(
 	
 		.mai(mai),
 		.sst_di(mout_hub.sst_di),
+		.sst_ctrl_we(sst_ctrl_we),
 		
 		.sst(mai.sst),
 		.pi_di(pi_di_sst),
 		.sst_act_smd(sst_act_smd),
-		.sst_act_sms(sst_act_sms)
+		.sst_act_sms(sst_act_sms),
+		.sst_ram_do(sst_ram_do),
+		.sst_ram_ce(sst_ram_ce)
 	);
 	
 `endif
 
 	
-`ifdef USE_SST_SMS	
+`ifdef SST_SMS_ON	
 
 	map_sys_sms sys_inst_sms(mai, mout_sys_sms);
 	
@@ -387,7 +405,7 @@ module everdrive(
 	wire [15:0]cheats_do;
 	wire cheats_oe;
 
-`ifdef USE_CHEATS
+`ifdef CHEATS_ON
 	
 	cheats cheats_inst(
 		
@@ -405,7 +423,7 @@ module everdrive(
 	wire mdp_act;
 	wire mdp_mcu_mode;
 	
-`ifdef USE_MDP
+`ifdef MDP_ON
 		
 	mdp mdp_inst(
 	
@@ -440,7 +458,7 @@ module everdrive(
 	MemCtrl sram_mcd;
 	MemCtrl bram_mcd;
 
-`ifdef USE_MCD	
+`ifdef MCD_ON
 	megacd_top megacd_inst(
 
 		.mai(mai),

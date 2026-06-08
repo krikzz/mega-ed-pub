@@ -1,7 +1,4 @@
 
-
-
-
 module base_io(
 
 	input  MapIn mai,
@@ -10,45 +7,42 @@ module base_io(
 	output [7:0]pi_di,
 	output [15:0]dato,
 	output io_oe, 
-	output pi_fifo_rxf,
+	output fci_fifo_rxf,
 	output MemCtrl	mio_mem,
-	output [3:0]mio_ce
+	output [3:0]mio_ce,
+	output sst_ctrl_we
 );
-
-	wire [15:0]cpu_data  = mai.cpu.data[15:0];
-	wire [23:0]cpu_addr  = mai.cpu.addr[23:0];
-	wire we_lo 				= mai.cpu.we_lo;
-	wire oe 					= mai.cpu.oe;
-	wire tim 				= mai.cpu.tim;
-	wire sys_rst			= mai.sys_rst;
+	
+	CpuBus cpu;
+	assign cpu	= mai.cpu;
+	
+	PiBus fci;
+	assign fci	= mai.pi;
+	
+	
 	wire clk					= mai.clk;
+	wire sys_rst			= mai.sys_rst;
 	wire sms_mode 			= mai.cfg.ct_sms;
+
 	
-	wire pi_ce_cfg 		= mai.pi.map.ce_cfg;
-	wire pi_ce_fifo		= mai.pi.map.ce_fifo;
-	wire pi_we 				= mai.pi.we;
-	wire pi_oe 				= mai.pi.oe;
-	wire pi_clk 			= mai.pi.clk;
-	
-	wire [31:0]pi_addr 	= mai.pi.addr[31:0];
-	wire [7:0]pi_do		= mai.pi.dato[7:0];
-	
-	assign pi_di[7:0] 	= fifo_do_b[7:0];
-	
+	assign pi_di[7:0] 	= 
+	fci.map.ce_mbx & fci.addr[0] == 0 ? mbx_ff[15:8] :
+	fci.map.ce_mbx & fci.addr[0] == 1 ? mbx_ff[7:0]  :
+	fifo_do_b[7:0];
 //****************************************************************************************************************** cpu regs
 	BaioDriver drv_smd;
-	assign drv_smd.ce				= !tim & {cpu_addr[7:4], 4'd0} == 8'hD0 & !sys_rst;
-	assign drv_smd.addr[3:0]	= {cpu_addr[3:1], 1'b0};
+	assign drv_smd.ce				= !cpu.tim & {cpu.addr[7:4], 4'd0} == 8'hD0 & !sys_rst;
+	assign drv_smd.addr[3:0]	= {cpu.addr[3:1], 1'b0};
 	assign drv_smd.data[15:0]	= reg_val[15:0];
-	assign drv_smd.oe				= !oe;
-	assign drv_smd.we				= !we_lo;
+	assign drv_smd.oe				= !cpu.oe;
+	assign drv_smd.we				= !cpu.we_lo;
 	
 	BaioDriver drv_sms;
-	assign drv_sms.ce				= !cpu_addr[18] & {cpu_addr[16:5], 4'd0} == 16'h0080 & sms_unlock;
-	assign drv_sms.addr[3:0]	= {cpu_addr[4:2], 1'b0};
-	assign drv_sms.data[15:0]	= cpu_addr[1] == 1 ? reg_val[15:8] : reg_val[7:0];
-	assign drv_sms.oe				= !oe;
-	assign drv_sms.we				= !we_lo;
+	assign drv_sms.ce				= !cpu.addr[18] & {cpu.addr[16:5], 4'd0} == 16'h0080 & sms_unlock;
+	assign drv_sms.addr[3:0]	= {cpu.addr[4:2], 1'b0};
+	assign drv_sms.data[15:0]	= cpu.addr[1] == 1 ? reg_val[15:8] : reg_val[7:0];
+	assign drv_sms.oe				= !cpu.oe;
+	assign drv_sms.we				= !cpu.we_lo;
 //*****
 	BaioDriver drv;
 	assign drv					= sms_mode ? drv_sms : drv_smd;
@@ -57,6 +51,8 @@ module base_io(
 	assign dato[15:0] 		= drv.data[15:0];
 	
 	wire [15:0]status 		= {8'h55, 4'hA, strobe, fpg_busy_flag, mcu_busy_flag, !mai.cfg.ct_gmode};
+	
+	assign sst_ctrl_we		= cpu_ce_sst_ctrl & base_io_we_sync;
 //*****
 
 	wire cpu_ce_fifo_data 	= drv.addr == 4'h0;
@@ -65,6 +61,8 @@ module base_io(
 	wire cpu_ce_timer     	= drv.addr == 4'h6;
 	wire cpu_ce_mdat			= drv.addr == 4'h8;
 	wire cpu_ce_madr			= drv.addr == 4'hA;
+	wire cpu_ce_sst_ctrl		= drv.addr == 4'hC;
+	wire cpu_ce_mbx			= drv.addr == 4'hE;
 	
 
 	wire tick_1ms 				= timer_1ms == 16'd49999;
@@ -76,8 +74,9 @@ module base_io(
 	reg mcu_busy_flag, fpg_busy_flag;//mcu flag resets when cmd complete, fpg flag resets after fpga reconfig
 	reg [15:0]regs_st;
 	reg sms_unlock;
+	
 
-	always @(posedge clk)
+	always_ff @(posedge clk)
 	begin
 		
 		if(base_io_oe_sync)
@@ -87,6 +86,7 @@ module base_io(
 			cpu_ce_fifo_stat 	? fifo_status[15:0] : 
 			cpu_ce_timer 		? timer[15:0] : 
 			cpu_ce_sys_stat 	? status[15:0] :
+			cpu_ce_mbx			? mbx[15:0] :
 			16'hffff;
 		end
 		
@@ -104,7 +104,7 @@ module base_io(
 		
 		if(base_io_we_sync & cpu_ce_sys_stat)
 		begin
-			{fpg_busy_flag, mcu_busy_flag} <= cpu_data[2:1];
+			{fpg_busy_flag, mcu_busy_flag} <= cpu.data[2:1];
 		end
 			else
 		if(!mcu_busy)
@@ -114,12 +114,12 @@ module base_io(
 		
 		if(sms_mode == 0)
 		begin
-			sms_unlock <= 0;
+			sms_unlock 	<= 0;
 		end
 			else
-		if(base_io_key_sync & cpu_addr[16:1] == 16'h008F)
+		if(base_io_key_sync & cpu.addr[16:1] == 16'h008F)
 		begin
-			sms_unlock <= cpu_data[7:0] == 8'h2A;//unlock io for sms mode. also used for sst ack in map_sys_sms
+			sms_unlock 	<= cpu.data[7:0] == 8'h2A;//unlock io for sms mode. also used for sst ack in map_sys_sms
 		end
 		
 	end
@@ -140,15 +140,15 @@ module base_io(
 	
 	sync_edge sync_inst_key(
 		.clk(clk),
-		.ce(!cpu_addr[18] & drv.we),
+		.ce(!cpu.addr[18] & drv.we),
 		.sync(base_io_key_sync)
 	);
 //****************************************************************************************************************** fifo				
-	wire [15:0]fifo_status = {fifo_rxf, pi_fifo_rxf, 3'd0, fifo_rd_len[10:0]};
+	wire [15:0]fifo_status = {fifo_rxf, fci_fifo_rxf, 3'd0, fifo_rd_len[10:0]};
 
 
-	wire pi_fifo_we = pi_ce_fifo & pi_we;
-	wire pi_fifo_oe = pi_ce_fifo & pi_oe;
+	wire fci_fifo_we = fci.map.ce_fifo & fci.we;
+	wire fci_fifo_oe = fci.map.ce_fifo & fci.oe;
 
 	wire [10:0]fifo_rd_len;
 	wire fifo_rxf;
@@ -157,10 +157,10 @@ module base_io(
 
 	wire [7:0]fifo_do_a;
 	fifo fifo_a(
-		.dti(pi_do),
+		.dti(fci.dato),
 		.dto(fifo_do_a),
 		.oe(fifo_oe),
-		.we(pi_fifo_we),
+		.we(fci_fifo_we),
 		.fifo_empty(fifo_rxf),
 		.rd_len(fifo_rd_len),
 		.clk(clk)
@@ -168,11 +168,11 @@ module base_io(
 
 	wire [7:0]fifo_do_b;
 	fifo fifo_b(
-		.dti(cpu_data[7:0]), 
+		.dti(cpu.data[7:0]), 
 		.dto(fifo_do_b), 
-		.oe(pi_fifo_oe), 
+		.oe(fci_fifo_oe), 
 		.we(fifo_we), 
-		.fifo_empty(pi_fifo_rxf),
+		.fifo_empty(fci_fifo_rxf),
 		.clk(clk)
 	);//moto to arm
 //************************************************************************************* momory io (mem access via REG_MEM_DATA/REG_MEM_ADDR)
@@ -181,7 +181,7 @@ module base_io(
 	mem_io mem_io_inst(
 	
 		.clk(mai.clk),
-		.dati(cpu_data[7:0]),
+		.dati(cpu.data[7:0]),
 		.oe(drv.oe),
 		.we(drv.we),
 		.ce_data(cpu_ce_mdat & drv.ce),
@@ -196,6 +196,46 @@ module base_io(
 		.mem_ce(mio_ce),
 		.dato(mio_dato)
 	);
+//****************************************************************************************************************** mbx
+	wire mbx_we_cpu	= cpu_ce_mbx & drv.ce & mai.cpu.we_ck;
+	wire mbx_we_fci	= fci.map.ce_mbx & fci.we_sync;
+	
+	reg [15:0]mbx;
+	reg [15:0]mbx_ff;
+	reg fci_oe_ff;
+	
+	always_ff @(posedge clk)
+	begin
+		
+		fci_oe_ff			<= fci.oe;
+		
+		if(!fci_oe_ff)
+		begin
+			mbx_ff			<= mbx;
+		end
+		
+		if(mbx_we_cpu & !cpu.we_hi)
+		begin
+			mbx[15:8]		<= cpu.data[15:8];
+		end
+			else
+		if(mbx_we_fci & fci.addr[0] == 0)
+		begin
+			mbx[15:8]		<= fci.dato[7:0];
+		end
+		
+		
+		if(mbx_we_cpu & !cpu.we_lo)
+		begin
+			mbx[7:0]		<= cpu.data[7:0];
+		end
+			else
+		if(mbx_we_fci & fci.addr[0] == 1)
+		begin
+			mbx[7:0]		<= fci.dato[7:0];
+		end
+		
+	end
 	
 endmodule
 
@@ -241,7 +281,6 @@ module fifo
 		.dout_b(dto), 
 		.clk_b(clk)
 	);
-
 	
 endmodule
 

@@ -66,18 +66,21 @@ typedef struct{
 	bit tim;
 	bit vclk;
 	//bit oe_as;
+	bit we_ck;
 	
 }CpuBus;
 
 //********
 
 typedef struct{
+
 	bit act;
 	bit ce_sni;
 	bit ce_map;
 	bit we_map;
 	bit [6:0]addr;
 	bit [7:0]dato;
+	
 }SSTBus;
 
 //********
@@ -133,10 +136,12 @@ endinterface
 //********
 
 typedef struct{
+
 	bit [15:0]dato;
 	bit [15:0]dati;
 	bit [18:0]addr;
 	bit ce, oe, we_lo, we_hi, bus_oe, led;
+	
 }BramIO;
 
 //********
@@ -170,7 +175,7 @@ typedef struct{
 	bit ce_mcd;
 	bit ce_mdp;
 	bit ce_mst;
-	
+	bit ce_mbx;
 	
 	bit ce_ggc;
 	bit ce_cfg;
@@ -200,10 +205,12 @@ typedef struct{
 //********
 
 typedef struct{
+
 	bit [7:0]pi_di;
 	bit [22:0]addr;
 	bit [15:0]data;
 	bit oe, we_lo, we_hi;
 	bit req_rom0, req_rom1, req_sram, req_bram;
 	bit mem_req;
+	
 }DmaBus;

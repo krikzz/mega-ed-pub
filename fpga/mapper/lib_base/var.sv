@@ -32,6 +32,7 @@ module mem_ctrl(
 endmodule
 //************************************************************************************* edge detectors
 module sync_edge(
+
 	input clk, ce, 
 	output sync
 );
@@ -208,7 +209,8 @@ module rst_ctrl(
 		if(map_idx == 0 | rst_off)rst_hold <= 0;
 		
 		
-		ext_rst <= btn & map_idx != 0 & !sms_mode;
+		//ext_rst <= btn & map_idx != 0 & !sms_mode;
+		ext_rst <= btn & !sms_mode;
 		
 		if(map_idx == 0)ext_rst_hold <= 0;
 			else
@@ -306,24 +308,28 @@ module bus_ctrl(
 	output dat_oe
 );
 
-
+	
 	assign dat_oe  = 0;
 	assign dat_dir = bus_oe & bus_ok == 2'b11 ? 1 : 0;
-
+		
+	wire rst_ck 	= sys_rst & !sys_rst_ff;
 	
-	wire rst_edge = sys_rst & !sys_rst_st;
-	
-	reg sys_rst_st;
+	reg sys_rst_ff;
 	reg [1:0]bus_ok;//bus_ok prewent hangs due undefined system state right after fpga_init
 	
 	always @(posedge clk)
 	begin
-	
-		sys_rst_st <= sys_rst;
 		
-		if(rst_edge)bus_ok <= 0;
+		sys_rst_ff 		<= sys_rst;
+		
+		if(rst_ck)
+		begin
+			bus_ok <= 0;
+		end
 			else
-		bus_ok[1:0] <= {bus_ok[0], 1'b1};
+		begin
+			bus_ok[1:0]	<= {bus_ok[0], 1'b1};
+		end
 		
 	end
 	
@@ -438,3 +444,50 @@ module dac_controller(
 	);
 	
 endmodule
+//************************************************************************************* ram dp
+
+module ram_dp #(
+	parameter int ADDR_W   = 16,
+	parameter int DATA_W   = 8
+)(
+	input  clk_a,
+	input  we_a,
+	input  [ADDR_W-1:0]addr_a,
+	input  [DATA_W-1:0]dati_a,
+	output [DATA_W-1:0]dato_a,
+	
+	input  clk_b,
+	input  we_b,
+	input  [ADDR_W-1:0]addr_b,
+	input  [DATA_W-1:0]dati_b,
+	output [DATA_W-1:0]dato_b
+);
+
+	
+	(* ramstyle = "M9K" *) reg [DATA_W-1:0]ram[(1 << ADDR_W)];
+	//reg [DATA_W-1:0]ram[65536];
+	
+	always @(posedge clk_a)
+	begin
+	
+		dato_a 			<= we_a ? dati_a : ram[addr_a];
+		
+		if(we_a)
+		begin
+			ram[addr_a] <= dati_a;
+		end
+	end
+	
+	always @(posedge clk_b)
+	begin
+	
+		dato_b 			<= we_b ? dati_b : ram[addr_b];
+		
+		if(we_b)
+		begin
+			ram[addr_b] <= dati_b;
+		end
+	end
+	
+endmodule
+

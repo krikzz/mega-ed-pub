@@ -25,6 +25,7 @@ typedef struct{
 	
 	bit fea_mcd;		//CD addon enable
 	bit fea_mdp;		//CD addon enable
+	bit fea_ext;		//Extension unit simulation
 	
 	bit [3:0]bram_type;
 	bit [3:0]bram_bus;//eeprom bus configuration
@@ -76,6 +77,7 @@ module sys_cfg(
 	
 	assign cfg.fea_mcd				= cfg.features[0];
 	assign cfg.fea_mdp				= cfg.features[1];
+	assign cfg.fea_ext				= cfg.features[2];
 	
 	assign cfg.bram_type[3:0] 		= cfg.bram_cfg[3:0];
 	assign cfg.bram_bus[3:0]  		= cfg.bram_cfg[7:4];

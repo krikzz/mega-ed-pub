@@ -37,6 +37,7 @@ module pi_map(
 	assign map.ce_cfg	 	= map.ce_sys & {pi_addr[15:3], 3'd0} == 16'h00f8;//8B 	sys config
 	assign map.ce_sst	 	= map.ce_sys & {pi_addr[15:8], 8'd0} == 16'h0100;//256B 	save state data. 128B sniffer, 128B map regs
 	assign map.ce_mst	 	= map.ce_sys & {pi_addr[15:1], 1'd0} == 16'h0200;//2B 	mapper status
+	assign map.ce_mbx		= map.ce_sys & {pi_addr[15:1], 1'd0} == 16'h0300;//2B 	gp mailbox
 	
 	assign map.ce_mcfg	= map.ce_map & {pi_addr[15:8], 8'd0}  == 16'hff00;//256B	mapper config.  
 	

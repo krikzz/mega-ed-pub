@@ -442,6 +442,9 @@ void deviceID() {
 
 void mailbox() {
 
+    // General-purpose mailbox register.
+    // Can be used for fast status exchange between the M68K and PC.
+
     u16 ctr = 0x1234;
 
     gCleanPlan();
@@ -456,7 +459,7 @@ void mailbox() {
         gConsPrint("run mbx_wr.py to write mailbox on PC");
         gConsPrint("press [A] to write ctr value in mailbox");
         gConsPrint("press [B] to exit");
-        
+
         gConsPrint("mailbox: 0x");
         gAppendHex16(EDIO->MBX);
 

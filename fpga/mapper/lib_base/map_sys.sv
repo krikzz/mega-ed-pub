@@ -39,5 +39,7 @@ module map_sys(
 	wire rom_ce  	= cart_ce & cpu.addr[23:18] == 0;//256K
 	wire ram_ce  	= cart_ce & cpu.addr[23:18] == 1;//256K
 	wire ibuf_ce 	= cart_ce & cpu.addr[23:19] == 1;//512K io buffer. mostly for save states
-
+	
+	
+	
 endmodule

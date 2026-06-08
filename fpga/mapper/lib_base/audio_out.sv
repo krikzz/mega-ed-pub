@@ -310,3 +310,54 @@ module mute_mono(
 
 endmodule
 
+//------------------------------------------------------------------------------------
+module vol_ctrl_m(
+
+	input  clk,
+	input  next_sample,
+	input  [4:0]vol,
+	input  signed [15:0]snd_i,
+	output signed [15:0]snd_o
+);
+	
+		
+	always_ff @(posedge clk)
+	if (next_sample)
+	begin
+		snd_o <= (snd_i * $signed({1'b0, vol})) / 16;
+   end
+	
+endmodule
+//------------------------------------------------------------------------------------
+module vol_ctrl_s(
+
+	input  clk,
+	input  next_sample,
+	input  [4:0]vol,
+	
+	input  signed [15:0]snd_i_l,
+	input  signed [15:0]snd_i_r,
+	
+	output signed [15:0]snd_o_l,
+	output signed [15:0]snd_o_r
+);
+	
+	vol_ctrl_m vol_l(
+
+		.clk(clk),
+		.next_sample(next_sample),
+		.vol(vol),
+		.snd_i(snd_i_l),
+		.snd_o(snd_o_l)
+	);
+	
+	vol_ctrl_m vol_r(
+
+		.clk(clk),
+		.next_sample(next_sample),
+		.vol(vol),
+		.snd_i(snd_i_r),
+		.snd_o(snd_o_r)
+	);
+	
+endmodule
