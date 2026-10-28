@@ -4,6 +4,8 @@ The Extended-SSF mapper provides eight configurable 512 KiB cartridge memory win
 
 **Backup RAM is mapped to bank 31**, the last bank.
 
+To activate the Extended-SSF mapper, replace the standard "SEGA MEGA DRIVE" string in the ROM header at offset `0x100` with "SEGA SSF".
+
 ## Cartridge Memory Map
 
 The cartridge address space contains eight 512 KiB windows. Each window maps to the memory bank selected by its corresponding control register.
@@ -43,7 +45,7 @@ All control registers are **write-only** and accept **16-bit writes only**.
 | 15 | `P` | Protection bit. Must be set to `1` when writing to `CTRL0` (`0xA130F0`). |
 | 13 | `W` | Memory write protection: `0` = protected, `1` = writable. |
 | 12 | `L` | LED control: `0` = off, `1` = on. |
-| 11 | `C` | `#CART` signal control. Directly controls the `#CART` line. Setting this bit swaps the cartridge (`0x000000–0x3FFFFF`) and Sega CD (`0x400000–0x7FFFFF`) address spaces. |
+| 11 | `C` | `#CART` signal control. Directly controls the `#CART` line. Setting this bit swaps the cartridge (`0x000000–0x3FFFFF`) and Sega-CD (`0x400000–0x7FFFFF`) address spaces. |
 | 4–0 | `R` | Memory bank selection (`0–31`); each bank is 512 KiB. |
 
 The `P`, `W`, `L`, and `C` fields are available only in `CTRL0`. The `R` field is available in all eight control registers. Dots (`.`) in the bit layouts indicate fields not defined in this specification.
