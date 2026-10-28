@@ -13,7 +13,7 @@ This repository contains libraries, tools and code examples for development targ
 | [`/edapp`](edapp/) | MegaColor player sources. Shows how to build applications which handle specific file types. |
 | [`/edlink.py`](edlink.py) | Basic cross-platform launcher script for `edlink.exe`. Requires Mono runtime on Linux and macOS. |
 | [`/edlink.exe`](edlink.exe) | USB utility for communication with EverDrive over USB. |
-| [`/extended-ssf.md`](extended-ssf.md) | Extended-SSF mapper specification, including memory windows, bank selection and control registers. |
+| [`/extended-ssf.md`](extended-ssf.md) | Extended-SSF mapper specification. |
 
 ---
 
